@@ -1,0 +1,38 @@
+{
+  "start_url": "https://example.com/",
+  "nodes": [
+    {"url": "https://example.com/", "status": 200, "title": "Example Tea Shop",
+     "text": "Loose leaf tea, teapots and brewing guides."},
+    {"url": "https://example.com/tea/", "status": 200, "title": "All teas",
+     "text": "Green tea, black tea and oolong tea sold by weight."},
+    {"url": "https://example.com/tea/green-tea/", "status": 200, "title": "Green tea",
+     "text": "Japanese and Chinese green tea. Brewing green tea at a low temperature keeps it sweet."},
+    {"url": "https://example.com/guides/", "status": 200, "title": "Brewing guides",
+     "text": "Guides about brewing tea, water temperature and steeping time."},
+    {"url": "https://example.com/guides/brewing-green-tea/", "status": 200,
+     "title": "How to brew green tea",
+     "text": "Brewing green tea needs a low water temperature and a short steeping time."},
+    {"url": "https://example.com/old-offer/", "status": 301,
+     "redirect_target": "https://example.com/tea/"},
+    {"url": "https://example.com/teapots/", "status": 404}
+  ],
+  "sitemap": [
+    "https://example.com/",
+    "https://example.com/tea/",
+    "https://example.com/guides/brewing-green-tea/"
+  ],
+  "edges": [
+    {"source": "https://example.com/", "target": "https://example.com/tea/", "anchor": "Teas"},
+    {"source": "https://example.com/", "target": "https://example.com/guides/", "anchor": "Guides"},
+    {"source": "https://example.com/", "target": "https://example.com/old-offer/", "anchor": "Offer"},
+    {"source": "https://example.com/", "target": "https://example.com/teapots/", "anchor": "Teapots"},
+    {"source": "https://example.com/tea/", "target": "https://example.com/", "anchor": "Home"},
+    {"source": "https://example.com/tea/", "target": "https://example.com/tea/green-tea/",
+     "anchor": "Green tea"},
+    {"source": "https://example.com/tea/green-tea/", "target": "https://example.com/tea/",
+     "anchor": "All teas"},
+    {"source": "https://example.com/guides/", "target": "https://example.com/", "anchor": "Home"},
+    {"source": "https://example.com/guides/", "target": "https://example.com/tea/",
+     "anchor": "click here", "rel": ["nofollow"]}
+  ]
+}

@@ -1,0 +1,30 @@
+source,target,anchor
+https://example.com/,https://example.com/blog/,Blog
+https://example.com/,https://example.com/services/,Services
+https://example.com/,https://example.com/about/,About us
+https://example.com/,https://example.com/contact/,Contact
+https://example.com/blog/,https://example.com/,Home
+https://example.com/blog/,https://example.com/blog/internal-linking-guide/,Internal linking guide
+https://example.com/blog/,https://example.com/blog/technical-seo-checklist/,Technical SEO checklist
+https://example.com/blog/,https://example.com/blog/page/2/,Older posts
+https://example.com/blog/page/2/,https://example.com/blog/,Newer posts
+https://example.com/blog/page/2/,https://example.com/blog/anchor-text-basics/,Anchor text basics
+https://example.com/blog/page/2/,https://example.com/blog/crawl-budget-explained/,Crawl budget explained
+https://example.com/blog/internal-linking-guide/,https://example.com/blog/,Blog
+https://example.com/blog/internal-linking-guide/,https://example.com/services/seo-audit/,SEO audit
+https://example.com/blog/internal-linking-guide/,https://example.com/blog/technical-seo-checklist/,click here
+https://example.com/blog/technical-seo-checklist/,https://example.com/blog/,Blog
+https://example.com/blog/technical-seo-checklist/,https://example.com/services/seo-audit/,SEO audit
+https://example.com/blog/anchor-text-basics/,https://example.com/blog/,Blog
+https://example.com/blog/crawl-budget-explained/,https://example.com/blog/crawl-budget-explained/log-file-analysis/,Log file analysis
+https://example.com/services/,https://example.com/,Home
+https://example.com/services/,https://example.com/services/seo-audit/,SEO audit
+https://example.com/services/,https://example.com/services/link-building/,Link building
+https://example.com/services/,https://example.com/contact/,Get in touch
+https://example.com/services/seo-audit/,https://example.com/services/,Services
+https://example.com/services/seo-audit/,https://example.com/contact/,Contact
+https://example.com/services/link-building/,https://example.com/services/,Services
+https://example.com/about/,https://example.com/,Home
+https://example.com/about/,https://example.com/contact/,Contact
+https://example.com/contact/,https://example.com/,Home
+https://example.com/landing/spring-offer/,https://example.com/services/seo-audit/,SEO audit
