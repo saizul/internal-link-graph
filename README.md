@@ -362,8 +362,8 @@ MIT - see [LICENSE](LICENSE). Copyright (c) 2026 Saizul Amin.
 A multi-arch image (linux/amd64, linux/arm64) is published to GitHub Packages:
 
 ```bash
-docker pull ghcr.io/saizul/internal-link-graphatest
-docker run --rm -v "$PWD:/work" ghcr.io/saizul/internal-link-graphatest --help
+docker pull ghcr.io/saizul/internal-link-graph:latest
+docker run --rm -v "$PWD:/work" ghcr.io/saizul/internal-link-graph:latest --help
 ```
 
 Mount the folder with your input files at `/work`; output files are written there too.
