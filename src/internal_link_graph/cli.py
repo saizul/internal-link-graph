@@ -26,8 +26,9 @@ from .htmlreport import to_html
 from .importers import FORMATS, ImportFormatError, load_site
 from .models import SiteData
 from .report import format_summary, to_markdown
+from .robots import RobotsRules, RobotsVerdict, fetch_robots, rules_for_response
 from .suggest import SuggestConfig, Suggestion, suggest_links
-from .urlnorm import NormalizeOptions
+from .urlnorm import NormalizeOptions, origin_of
 
 EXPORT_FORMATS = ("json", "csv", "graphml", "dot", "markdown", "html")
 EXIT_OK = 0
@@ -223,6 +224,24 @@ def build_parser() -> argparse.ArgumentParser:
     _add_analysis_options(diff)
     diff.add_argument("--top", type=_positive_int, default=15)
     diff.add_argument("--json", metavar="FILE", help="also write the comparison as JSON")
+
+    robots = commands.add_parser(
+        "robots", help="check which URLs a robots.txt allows, and which rule decides"
+    )
+    robots.add_argument(
+        "source", help="a local robots.txt file, or a site URL whose /robots.txt is fetched"
+    )
+    robots.add_argument("urls", nargs="*", metavar="URL", help="URLs or paths to check")
+    robots.add_argument(
+        "--urls-file", metavar="FILE", help="read more URLs from a file (one per line, # comments)"
+    )
+    robots.add_argument("--user-agent", default=DEFAULT_USER_AGENT)
+    robots.add_argument("--timeout", type=_non_negative_float, default=15.0)
+    robots.add_argument("--output-format", choices=("text", "json"), default="text")
+    robots.add_argument(
+        "--fail-on-blocked", action="store_true",
+        help=f"exit with status {EXIT_ISSUES} when any checked URL is disallowed",
+    )
     return parser
 
 
@@ -453,13 +472,92 @@ def cmd_diff(args: argparse.Namespace, stdout: TextIO, stderr: TextIO) -> int:
     return EXIT_OK
 
 
+def _robots_source(
+    args: argparse.Namespace, fetcher: Fetcher | None
+) -> tuple[str, RobotsRules]:
+    source = args.source
+    if re.match(r"^https?://", source, re.IGNORECASE):
+        if fetcher is None:
+            fetcher = UrllibFetcher(user_agent=args.user_agent, timeout=args.timeout)
+        return origin_of(source) + "/robots.txt", fetch_robots(fetcher, source)
+    try:
+        text = Path(source).read_bytes()
+    except OSError as exc:
+        raise CliError(f"cannot read {source}: {exc.strerror or exc}") from exc
+    rules = rules_for_response(200, text)
+    rules.status = 0  # a local file has no HTTP status
+    return source, rules
+
+
+def _robots_urls(args: argparse.Namespace) -> list[str]:
+    urls = list(args.urls)
+    if args.urls_file:
+        try:
+            lines = Path(args.urls_file).read_text(encoding="utf-8").splitlines()
+        except (OSError, UnicodeDecodeError) as exc:
+            raise CliError(f"cannot read {args.urls_file}: {exc}") from exc
+        urls.extend(line.strip() for line in lines if line.strip() and not line.startswith("#"))
+    if not urls:
+        raise CliError("give at least one URL to check (or --urls-file FILE)")
+    return urls
+
+
+def format_robots_report(
+    label: str, rules: RobotsRules, user_agent: str, verdicts: Sequence[RobotsVerdict]
+) -> str:
+    lines = [f"robots.txt: {label}" + (f" (status {rules.status})" if rules.status else "")]
+    if rules.truncated:
+        lines.append("warning: file is larger than 500 KiB; the rest was ignored")
+    delay = rules.crawl_delay(user_agent)
+    lines.append(f"User agent: {user_agent}")
+    if delay is not None:
+        lines.append(f"Crawl-delay: {delay:g}")
+    if rules.sitemaps:
+        lines.append(f"Sitemaps: {len(rules.sitemaps)}")
+    lines.append("")
+    width = max(len(verdict.url) for verdict in verdicts)
+    for verdict in verdicts:
+        status = "allowed" if verdict.allowed else "blocked"
+        why = str(verdict.rule) if verdict.rule is not None else verdict.reason
+        if verdict.agents:
+            why += f"  [group: {', '.join(verdict.agents)}]"
+        lines.append(f"{status}  {verdict.url:<{width}}  {why}".rstrip())
+    blocked = sum(1 for verdict in verdicts if not verdict.allowed)
+    lines.append("")
+    lines.append(f"{len(verdicts) - blocked} allowed, {blocked} blocked")
+    return "\n".join(lines) + "\n"
+
+
+def cmd_robots(args: argparse.Namespace, stdout: TextIO, stderr: TextIO,
+               fetcher: Fetcher | None) -> int:
+    urls = _robots_urls(args)
+    label, rules = _robots_source(args, fetcher)
+    verdicts = [rules.check(args.user_agent, url) for url in urls]
+    if args.output_format == "json":
+        payload = {
+            "robots_txt": label,
+            "status": rules.status or None,
+            "user_agent": args.user_agent,
+            "crawl_delay": rules.crawl_delay(args.user_agent),
+            "sitemaps": list(rules.sitemaps),
+            "truncated": rules.truncated,
+            "results": [verdict.to_dict() for verdict in verdicts],
+        }
+        stdout.write(json.dumps(payload, ensure_ascii=False, indent=2) + "\n")
+    else:
+        stdout.write(format_robots_report(label, rules, args.user_agent, verdicts))
+    if args.fail_on_blocked and any(not verdict.allowed for verdict in verdicts):
+        return EXIT_ISSUES
+    return EXIT_OK
+
+
 def main(
     argv: Sequence[str] | None = None,
     fetcher: Fetcher | None = None,
     stdout: TextIO | None = None,
     stderr: TextIO | None = None,
 ) -> int:
-    """Entry point. ``fetcher`` lets tests run the ``crawl`` command offline."""
+    """Entry point. ``fetcher`` lets tests run ``crawl`` and ``robots`` offline."""
     stdout = stdout or sys.stdout
     stderr = stderr or sys.stderr
     parser = build_parser()
@@ -481,6 +579,8 @@ def main(
             return cmd_export(args, stdout, stderr)
         if args.command == "diff":
             return cmd_diff(args, stdout, stderr)
+        if args.command == "robots":
+            return cmd_robots(args, stdout, stderr, fetcher)
     except CliError as exc:
         stderr.write(f"error: {exc}\n")
         return EXIT_ERROR

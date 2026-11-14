@@ -7,6 +7,25 @@ project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- `robots` command: checks URLs or paths against a local robots.txt file or a site's live
+  `/robots.txt` and reports, per URL, whether it is allowed and which line decided it.
+  Supports `--user-agent`, `--urls-file`, `--output-format text|json` and
+  `--fail-on-blocked` (exit status 3) for CI checks.
+- `parse_robots`, `RobotsRules` and `RobotsVerdict` are exported from the package;
+  `RobotsRules.check()` explains a decision.
+
+### Changed
+
+- robots.txt is now parsed by an RFC 9309 implementation instead of
+  `urllib.robotparser`: `*` and `$` wildcards are honoured, the longest matching rule wins
+  (with `Allow` winning ties) instead of the first one, groups for the same user agent are
+  merged, user agents are matched on their full product token instead of a substring,
+  percent-encoding is normalised, `/robots.txt` is always allowed and only the first 500 KiB
+  of the file are parsed. Crawls of sites that rely on these rules can fetch a different set
+  of URLs than before.
+
 ## [0.1.0] - 2026-11-11
 
 ### Added
