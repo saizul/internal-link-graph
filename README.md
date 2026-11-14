@@ -23,6 +23,9 @@ $ internal-link-graph suggest crawl.json
 
 - Polite by default: obeys `robots.txt` (including `Crawl-delay`), rate limits per host and
   identifies itself with a clear user agent.
+- `robots.txt` is interpreted as RFC 9309 says: `*` and `$` wildcards, longest-match
+  precedence with `Allow` winning ties, merged groups per user agent, normalised
+  percent-encoding. `robots` checks URLs against a file and names the rule that decides.
 - Seeds from `sitemap.xml` (sitemap indexes and gzip supported), so pages that exist but are
   never linked show up as orphans.
 - Follows and records every hop of a redirect chain.
@@ -108,6 +111,7 @@ Only crawl sites you own or have permission to crawl, and keep the delay reasona
 | `suggest INPUT` | Propose internal links worth adding (text, CSV or JSON) |
 | `export INPUT --to FORMAT` | Export as `json`, `csv`, `graphml`, `dot`, `markdown` or `html` |
 | `diff OLD NEW` | Compare two crawls |
+| `robots SOURCE URL...` | Check URLs against a robots.txt file or a site's live robots.txt |
 
 `INPUT` is a crawl JSON file, an edge list (CSV or JSON) or a Screaming Frog CSV. The format is
 detected automatically; force it with `--format crawl|edges|screaming-frog`.
@@ -128,10 +132,13 @@ suggest   --max-suggestions 50  --min-similarity 0.1  --min-depth 3  --max-inlin
           --unicode  --output-format text|csv|json  -o FILE
 export    --to FORMAT  -o PATH  --suggestions  --max-nodes 200
 diff      --top 15  --json FILE
+robots    --user-agent UA  --urls-file FILE  --output-format text|json
+          --fail-on-blocked
 ```
 
 `analyze --fail-on error` exits with status 3 when errors are found, which makes the tool
-usable as a CI check against a staging site. Other exit codes: 0 success, 1 runtime error
+usable as a CI check against a staging site. `robots --fail-on-blocked` does the same when a
+checked URL is disallowed. Other exit codes: 0 success, 1 runtime error
 (unreadable input, invalid crawl settings), 2 usage error.
 
 ### Resuming a crawl
@@ -141,6 +148,45 @@ $ internal-link-graph crawl https://example.com/ --state crawl.sqlite -o crawl.j
 ^C
 $ internal-link-graph crawl https://example.com/ --state crawl.sqlite --resume -o crawl.json
 ```
+
+### Testing robots.txt rules
+
+`robots` answers "would the crawler fetch this URL, and why?" for a local file (handy before
+deploying a new robots.txt) or for a live site, whose `/robots.txt` is fetched:
+
+```console
+$ internal-link-graph robots robots.txt / /private/report /private/press/kit /docs/a.pdf
+robots.txt: robots.txt
+User agent: internal-link-graph/0.1.0 (+https://github.com/saizul/internal-link-graph)
+Crawl-delay: 2
+Sitemaps: 1
+
+allowed  /                   no matching rule  [group: *]
+blocked  /private/report     line 3: Disallow: /private/  [group: *]
+allowed  /private/press/kit  line 4: Allow: /private/press/  [group: *]
+blocked  /docs/a.pdf         line 5: Disallow: /*.pdf$  [group: *]
+
+2 allowed, 2 blocked
+$ internal-link-graph robots https://example.com/ --urls-file important.txt --fail-on-blocked
+```
+
+`--user-agent` checks the rules as another crawler would see them (only the product token,
+such as `Googlebot`, is used to pick the group). `--output-format json` gives the same result
+in machine-readable form. The crawler applies exactly these rules:
+
+- A group is chosen by the crawler's product token, compared case-insensitively and in full
+  (`bot` does not match `testbot`). All groups naming that token are merged; the `*` group
+  is only used when none does, and no group at all means everything is allowed.
+- `*` matches any run of characters and a trailing `$` anchors the pattern at the end of the
+  path and query. Patterns are case-sensitive.
+- The longest matching pattern decides. If an `Allow` and a `Disallow` pattern are equally
+  long, `Allow` wins. Rule order in the file does not matter.
+- Percent-encoding is normalised on both sides (`/caf%C3%A9` equals `/café`, `%7e` equals
+  `~`), but encoded reserved characters such as `%2F` stay distinct.
+- `/robots.txt` is always allowed, rules before the first `User-agent` line are ignored,
+  and only the first 500 KiB of the file are read.
+- A 401 or 403 response blocks the whole site, any other 4xx allows everything, and a 5xx or
+  network error blocks the site for the rest of the crawl.
 
 ### Edge list formats
 
@@ -339,9 +385,9 @@ site = crawl("https://example.com/", fetcher=fetcher, delay=0)
   `--unicode` only Latin-script words are tokenised.
 - Near-duplicate title detection compares titles pairwise within buckets and is meant for
   catching templates, not for content deduplication.
-- `robots.txt` is parsed with the standard library's `urllib.robotparser`: `Allow`,
-  `Disallow`, `Crawl-delay` and `Sitemap` are understood, but the `*` and `$` path wildcards
-  that some search engines support are not.
+- `robots.txt` support covers `User-agent`, `Allow`, `Disallow`, `Crawl-delay` and `Sitemap`
+  as described above. Other directives (such as `Host` or `Clean-param`) are ignored, and
+  the delay of the matching group applies to the whole host.
 
 ## Development
 

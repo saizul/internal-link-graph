@@ -22,6 +22,7 @@ from .graph import (  # noqa: E402
 )
 from .importers import load_site  # noqa: E402
 from .models import Link, Page, SiteData  # noqa: E402
+from .robots import RobotsRules, RobotsVerdict, parse_robots  # noqa: E402
 from .suggest import SuggestConfig, Suggestion, suggest_links  # noqa: E402
 from .urlnorm import NormalizeOptions, normalize_url  # noqa: E402
 
@@ -41,6 +42,8 @@ __all__ = [
     "NormalizeOptions",
     "Page",
     "Response",
+    "RobotsRules",
+    "RobotsVerdict",
     "SiteData",
     "SuggestConfig",
     "Suggestion",
@@ -55,6 +58,7 @@ __all__ = [
     "load_site",
     "normalize_url",
     "pagerank",
+    "parse_robots",
     "shortest_path",
     "strongly_connected_components",
     "suggest_links",
