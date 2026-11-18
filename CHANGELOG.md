@@ -9,6 +9,15 @@ project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- `path` command: shows the shortest click paths from the homepage (or `--start-url`) to one
+  or more target URLs or paths, with the anchor text of every hop. Supports `--targets-file`,
+  `--max-paths N` for equally short alternatives, `--include-nofollow`,
+  `--output-format text|json` and `--max-depth N` (exit status 3 when a target is unreachable
+  or deeper than N clicks) for CI checks.
+- `all_shortest_paths()` graph helper and `find_click_paths()`, `ClickPath` and `PathHop`
+  library API.
+- Contributor community files: `CODE_OF_CONDUCT.md`, issue templates and a pull request
+  template.
 - `robots` command: checks URLs or paths against a local robots.txt file or a site's live
   `/robots.txt` and reports, per URL, whether it is allowed and which line decided it.
   Supports `--user-agent`, `--urls-file`, `--output-format text|json` and

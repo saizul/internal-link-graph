@@ -14,6 +14,7 @@ from .diff import CrawlDiff, diff_analyses, diff_sites  # noqa: E402
 from .fetcher import DictFetcher, Fetcher, Response, UrllibFetcher  # noqa: E402
 from .graph import (  # noqa: E402
     LinkGraph,
+    all_shortest_paths,
     click_depth,
     hits,
     pagerank,
@@ -22,6 +23,7 @@ from .graph import (  # noqa: E402
 )
 from .importers import load_site  # noqa: E402
 from .models import Link, Page, SiteData  # noqa: E402
+from .paths import ClickPath, PathHop, find_click_paths  # noqa: E402
 from .robots import RobotsRules, RobotsVerdict, parse_robots  # noqa: E402
 from .suggest import SuggestConfig, Suggestion, suggest_links  # noqa: E402
 from .urlnorm import NormalizeOptions, normalize_url  # noqa: E402
@@ -29,6 +31,7 @@ from .urlnorm import NormalizeOptions, normalize_url  # noqa: E402
 __all__ = [
     "AnalysisConfig",
     "AnalysisResult",
+    "ClickPath",
     "CrawlConfig",
     "CrawlDiff",
     "CrawlError",
@@ -41,6 +44,7 @@ __all__ = [
     "NodeMetrics",
     "NormalizeOptions",
     "Page",
+    "PathHop",
     "Response",
     "RobotsRules",
     "RobotsVerdict",
@@ -49,11 +53,13 @@ __all__ = [
     "Suggestion",
     "UrllibFetcher",
     "__version__",
+    "all_shortest_paths",
     "analyze",
     "click_depth",
     "crawl",
     "diff_analyses",
     "diff_sites",
+    "find_click_paths",
     "hits",
     "load_site",
     "normalize_url",

@@ -66,6 +66,7 @@ $ internal-link-graph suggest crawl.json
   Cytoscape), Graphviz DOT, Markdown and a self-contained HTML report with inline SVG charts
   (no JavaScript, no external assets).
 - `diff` compares two crawls: new and lost pages and links, PageRank movers, depth changes.
+- `path` shows the shortest click paths (with anchor text) from the homepage to any page.
 
 ## Installation
 
@@ -111,6 +112,7 @@ Only crawl sites you own or have permission to crawl, and keep the delay reasona
 | `suggest INPUT` | Propose internal links worth adding (text, CSV or JSON) |
 | `export INPUT --to FORMAT` | Export as `json`, `csv`, `graphml`, `dot`, `markdown` or `html` |
 | `diff OLD NEW` | Compare two crawls |
+| `path INPUT URL...` | Show the shortest click paths from the homepage to pages, with anchor text |
 | `robots SOURCE URL...` | Check URLs against a robots.txt file or a site's live robots.txt |
 
 `INPUT` is a crawl JSON file, an edge list (CSV or JSON) or a Screaming Frog CSV. The format is
@@ -132,13 +134,16 @@ suggest   --max-suggestions 50  --min-similarity 0.1  --min-depth 3  --max-inlin
           --unicode  --output-format text|csv|json  -o FILE
 export    --to FORMAT  -o PATH  --suggestions  --max-nodes 200
 diff      --top 15  --json FILE
+path      --targets-file FILE  --max-paths N  --include-nofollow  --max-depth N
+          --output-format text|json
 robots    --user-agent UA  --urls-file FILE  --output-format text|json
           --fail-on-blocked
 ```
 
 `analyze --fail-on error` exits with status 3 when errors are found, which makes the tool
 usable as a CI check against a staging site. `robots --fail-on-blocked` does the same when a
-checked URL is disallowed. Other exit codes: 0 success, 1 runtime error
+checked URL is disallowed, and `path --max-depth N` when a target is unreachable or more than
+N clicks deep. Other exit codes: 0 success, 1 runtime error
 (unreadable input, invalid crawl settings), 2 usage error.
 
 ### Resuming a crawl
@@ -148,6 +153,31 @@ $ internal-link-graph crawl https://example.com/ --state crawl.sqlite -o crawl.j
 ^C
 $ internal-link-graph crawl https://example.com/ --state crawl.sqlite --resume -o crawl.json
 ```
+
+### Click paths to a page
+
+`path` explains why a page is deep: it lists the shortest chains of internal links from the
+homepage to each target, with the anchor text used at every hop. Targets can be full URLs or
+paths; redirects are followed and a missing trailing slash is tolerated.
+
+```console
+$ internal-link-graph path crawl.json /blog/rose-diseases /orphan --max-paths 2
+From: https://example.com/
+
+https://example.com/blog/rose-diseases  depth 3
+  https://example.com/
+  -> https://example.com/blog/  "Blog"
+  -> https://example.com/blog/pruning-roses  "Pruning roses"
+  -> https://example.com/blog/rose-diseases  "click here"
+
+https://example.com/orphan  unreachable from the start URL (0 internal inlinks)
+
+1 of 2 reachable
+```
+
+`--max-paths N` lists up to N equally short paths, `--include-nofollow` also follows nofollow
+links, `--output-format json` gives machine-readable output and `--max-depth N` turns it into a
+CI check (exit status 3 when a target is unreachable or deeper than N clicks).
 
 ### Testing robots.txt rules
 
@@ -355,6 +385,17 @@ graph.add_edge("a", "b")
 graph.add_edge("b", "a")
 result = pagerank(graph)
 print(result.scores, result.iterations, result.converged)
+```
+
+Click paths are available as well:
+
+```python
+from internal_link_graph import find_click_paths
+
+start, results = find_click_paths(site, ["/blog/rose-diseases"], max_paths=3)
+for result in results:
+    for path in result.paths:
+        print(result.depth, " -> ".join(hop.url for hop in path))
 ```
 
 Tests and dry runs can replace the network with an in-memory site:
