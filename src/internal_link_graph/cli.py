@@ -25,6 +25,7 @@ from .fetcher import DEFAULT_USER_AGENT, Fetcher, UrllibFetcher
 from .htmlreport import to_html
 from .importers import FORMATS, ImportFormatError, load_site
 from .models import SiteData
+from .paths import find_click_paths, format_click_paths
 from .report import format_summary, to_markdown
 from .robots import RobotsRules, RobotsVerdict, fetch_robots, rules_for_response
 from .suggest import SuggestConfig, Suggestion, suggest_links
@@ -224,6 +225,30 @@ def build_parser() -> argparse.ArgumentParser:
     _add_analysis_options(diff)
     diff.add_argument("--top", type=_positive_int, default=15)
     diff.add_argument("--json", metavar="FILE", help="also write the comparison as JSON")
+
+    path = commands.add_parser(
+        "path", help="show the shortest click paths from the homepage to pages"
+    )
+    path.add_argument("input")
+    path.add_argument(
+        "targets", nargs="*", metavar="URL", help="target URLs or paths such as /blog/post"
+    )
+    path.add_argument(
+        "--targets-file", metavar="FILE", help="read more targets from a file (one per line)"
+    )
+    _add_input_options(path)
+    path.add_argument(
+        "--max-paths", type=_positive_int, default=1,
+        help="list up to N equally short paths per target (default: 1)",
+    )
+    path.add_argument(
+        "--include-nofollow", action="store_true", help="also follow nofollow links"
+    )
+    path.add_argument(
+        "--max-depth", type=_positive_int, metavar="N",
+        help=f"exit with status {EXIT_ISSUES} when a target is unreachable or deeper than N",
+    )
+    path.add_argument("--output-format", choices=("text", "json"), default="text")
 
     robots = commands.add_parser(
         "robots", help="check which URLs a robots.txt allows, and which rule decides"
@@ -472,6 +497,46 @@ def cmd_diff(args: argparse.Namespace, stdout: TextIO, stderr: TextIO) -> int:
     return EXIT_OK
 
 
+def _read_list(path: str) -> list[str]:
+    try:
+        lines = Path(path).read_text(encoding="utf-8").splitlines()
+    except (OSError, UnicodeDecodeError) as exc:
+        raise CliError(f"cannot read {path}: {exc}") from exc
+    return [line.strip() for line in lines if line.strip() and not line.startswith("#")]
+
+
+def cmd_path(args: argparse.Namespace, stdout: TextIO, stderr: TextIO) -> int:
+    targets = list(args.targets)
+    if args.targets_file:
+        targets.extend(_read_list(args.targets_file))
+    if not targets:
+        raise CliError("give at least one target URL (or --targets-file FILE)")
+    site = _load(args.input, args)
+    if not site.pages:
+        raise CliError(f"{args.input} does not contain any pages or links")
+    start, results = find_click_paths(
+        site,
+        targets,
+        start_url=args.start_url or "",
+        follow_only=not args.include_nofollow,
+        max_paths=args.max_paths,
+    )
+    if args.output_format == "json":
+        payload = {
+            "start_url": start,
+            "max_depth": args.max_depth,
+            "results": [result.to_dict() for result in results],
+        }
+        stdout.write(json.dumps(payload, ensure_ascii=False, indent=2) + "\n")
+    else:
+        stdout.write(format_click_paths(start, results))
+    if args.max_depth is not None and any(
+        result.depth is None or result.depth > args.max_depth for result in results
+    ):
+        return EXIT_ISSUES
+    return EXIT_OK
+
+
 def _robots_source(
     args: argparse.Namespace, fetcher: Fetcher | None
 ) -> tuple[str, RobotsRules]:
@@ -492,11 +557,7 @@ def _robots_source(
 def _robots_urls(args: argparse.Namespace) -> list[str]:
     urls = list(args.urls)
     if args.urls_file:
-        try:
-            lines = Path(args.urls_file).read_text(encoding="utf-8").splitlines()
-        except (OSError, UnicodeDecodeError) as exc:
-            raise CliError(f"cannot read {args.urls_file}: {exc}") from exc
-        urls.extend(line.strip() for line in lines if line.strip() and not line.startswith("#"))
+        urls.extend(_read_list(args.urls_file))
     if not urls:
         raise CliError("give at least one URL to check (or --urls-file FILE)")
     return urls
@@ -579,6 +640,8 @@ def main(
             return cmd_export(args, stdout, stderr)
         if args.command == "diff":
             return cmd_diff(args, stdout, stderr)
+        if args.command == "path":
+            return cmd_path(args, stdout, stderr)
         if args.command == "robots":
             return cmd_robots(args, stdout, stderr, fetcher)
     except CliError as exc:

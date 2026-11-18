@@ -390,6 +390,53 @@ def shortest_path(graph: LinkGraph, start: str, goal: str) -> list[str]:
     return path
 
 
+def all_shortest_paths(
+    graph: LinkGraph, start: str, goal: str, limit: int | None = 10
+) -> list[list[str]]:
+    """Every shortest click path from ``start`` to ``goal``, up to ``limit`` of them.
+
+    Paths are returned in a deterministic order (by node insertion order, which
+    is sorted URL order for graphs built with :meth:`LinkGraph.from_site`).
+    The result is empty when ``goal`` is unreachable; ``limit=None`` returns
+    all paths, which can be exponential on densely linked sites.
+    """
+    origin = graph.index.get(start)
+    destination = graph.index.get(goal)
+    if origin is None or destination is None:
+        return []
+    if limit is not None and limit < 1:
+        return []
+    depth = {origin: 0}
+    queue = deque([origin])
+    while queue:
+        current = queue.popleft()
+        if current == destination:
+            break
+        for target in graph.out[current]:
+            if target not in depth:
+                depth[target] = depth[current] + 1
+                queue.append(target)
+    if destination not in depth:
+        return []
+
+    paths: list[list[str]] = []
+    # Walk backwards from the goal over predecessors one level closer to the start.
+    stack: list[tuple[int, list[int]]] = [(destination, [destination])]
+    while stack:
+        node, suffix = stack.pop()
+        if node == origin:
+            paths.append([graph.nodes[idx] for idx in reversed(suffix)])
+            if limit is not None and len(paths) >= limit:
+                break
+            continue
+        level = depth[node] - 1
+        parents = sorted(p for p in graph.inn[node] if depth.get(p) == level)
+        for parent in reversed(parents):
+            stack.append((parent, [*suffix, parent]))
+    paths.sort(key=lambda path: [graph.index[url] for url in path])
+    return paths
+
+
 def strongly_connected_components(graph: LinkGraph) -> list[list[str]]:
     """Strongly connected components via an iterative version of Tarjan's algorithm.
 
